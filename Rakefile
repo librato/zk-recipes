@@ -15,11 +15,11 @@ require 'jeweler'
 Jeweler::Tasks.new do |gem|
   # gem is a Gem::Specification... see http://docs.rubygems.org/read/chapter/20 for more options
   gem.name = "zk-recipes"
-  gem.homepage = "http://github.com/mheffner/zk-recipes"
+  gem.homepage = "http://github.com/librato/zk-recipes"
   gem.license = "MIT"
-  gem.summary = %Q{TODO: one-line summary of your gem}
-  gem.description = %Q{TODO: longer description of your gem}
-  gem.email = "mikeh@fesnel.com"
+  gem.summary = %Q{ZooKeeper recipes}
+  gem.description = %Q{ZooKeeper recipes}
+  gem.email = "mike@librato.com"
   gem.authors = ["Mike Heffner"]
   # dependencies defined in Gemfile
 end

@@ -1,0 +1,32 @@
+#!/usr/bin/env ruby
+#
+#
+# Test driver for the exclusivity recipe.
+#
+#####
+
+$:.unshift File.join(File.dirname(__FILE__), '../lib')
+
+require 'zk-recipes'
+
+if ARGV.length != 1
+  puts "Usage: zk-exclusive-check <host>"
+  exit 1
+end
+
+host = ARGV.first
+
+puts "Connecting to ZooKeeper host: #{host}"
+
+ZkRecipes.setup(host)
+
+begin
+  leader = ZkRecipes::Exclusive.proceed?("zktest")
+  if leader
+    puts "I am the leader and may proceed"
+  else
+    puts "I am NOT the leader and will exit"
+  end
+rescue => err
+  puts "Failed to check leader: #{err.message}"
+end
