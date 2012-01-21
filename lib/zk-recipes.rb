@@ -1,8 +1,5 @@
 
-require 'rubygems'
-require 'bundler'
-
-Bundler.require
+require 'zookeeper'
 
 $:.unshift File.join(File.dirname(__FILE__), 'zk-recipes')
 
