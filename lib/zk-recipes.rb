@@ -4,6 +4,7 @@ require 'zookeeper'
 $:.unshift File.join(File.dirname(__FILE__), 'zk-recipes')
 
 require 'exclusive'
+require 'work_pool'
 
 module ZkRecipes
   def self.version
