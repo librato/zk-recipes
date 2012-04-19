@@ -4,12 +4,17 @@
 module ZkRecipes
   module Presence
     def self.update(namespace, node_id, payload)
-      root = "/#{namespace}"
+      root = "/"
 
-      r = ZkRecipes::conn.create(:path => root)
-      if r[:rc] != Zookeeper::ZOK &&
-          r[:rc] != Zookeeper::ZNODEEXISTS
-        raise "Failed to create namespace: %s" % namespace
+      # Create each part of the search path
+      namespace.split("/").each do |part|
+        root = "#{root}/#{part}"
+
+        r = ZkRecipes::conn.create(:path => root)
+        if r[:rc] != Zookeeper::ZOK &&
+            r[:rc] != Zookeeper::ZNODEEXISTS
+          raise "Failed to create namespace: %s" % root
+        end
       end
 
       presence_path = "#{root}/#{node_id}"
