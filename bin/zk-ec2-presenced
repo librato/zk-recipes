@@ -1,0 +1,126 @@
+#!/usr/bin/env ruby
+#
+# Register and optionally maintain presence in a group. This is for
+# situations where absolute real-time group membership is not
+# necessary. This uses a TTL method to keep presence records active
+# and hence does not use ephemeral znodes.
+#
+# Presence information is pulled from EC2 meta-data. Nodes register
+# with their EC2 instance ID.
+#
+
+require 'rubygems'
+require 'bundler'
+require 'logger'
+
+CLIENT_TIMEOUT = 60 * 15
+
+Bundler.require
+
+$:.unshift File.join(File.dirname(__FILE__), '../lib')
+
+require 'zk-recipes'
+
+opts = Trollop::options do
+  opt :hosts, "ZK Hosts", :type => :string
+  opt :port, "ZK Port", :default => 2181
+
+  opt :namespace, "ZK Namespace", :default => "presence"
+  opt :type, "Node type", :type => :string
+
+  opt :refresh_secs, "How often to refresh (in seconds)", :default => 300
+
+  opt :logfile, "Logfile", :default => "/var/log/zk-ec2-presenced.log"
+  opt :loglevel, "Loglevel", :default => "INFO"
+
+  opt :list, "List registered instances"
+end
+
+unless opts[:hosts]
+  puts "Must specify ZK hosts"
+  exit 1
+end
+
+unless opts[:type]
+  puts "Must specify node type"
+  exit 1
+end
+
+begin
+  file = File.open(opts[:logfile], "a")
+  file.sync = true
+rescue => err
+  puts "Failed to open logfile #{opts[:logfile]}: #{err.message}"
+  exit 1
+end
+
+$log = Logger.new(file, opts[:loglevel].upcase)
+
+def get_ec2_data(file)
+  %x{curl -s http://169.254.169.254/latest/meta-data/#{file}}.chomp
+end
+
+path = "#{opts[:namespace]}/#{opts[:type]}"
+
+zk_hosts = opts[:hosts].split(",")
+zk_host = zk_hosts[rand(zk_hosts.length)]
+
+$log.info("Connecting to ZK host at #{zk_host}:#{opts[:port]}")
+
+ZkRecipes.setup(zk_host, opts[:port])
+
+if opts[:list]
+  clients = ZkRecipes::Presence.list(path)
+  now = Time.now.tv_sec
+
+  active_clients = []
+
+  clients.each do |client|
+    client = Yajl::Parser.parse(client)
+
+    if client['last_update'] &&
+        (client['last_update'] > now ||
+         (now - client['last_update']) < CLIENT_TIMEOUT)
+      active_clients << client
+    end
+  end
+
+  if active_clients.length == 0
+    puts "No active clients."
+  else
+    puts "Active clients:"
+    puts
+    puts "%10s  %14s  %s" % ['AZ', 'IP Addr', 'Hostname']
+    active_clients.each do |cl|
+      puts "%10s  %14s  %s" % [cl['az'], cl['private_ip'],
+                              cl['public_hostname']]
+    end
+  end
+
+  exit 0
+end
+
+inst_id = get_ec2_data("instance-id")
+pub_name = get_ec2_data("public-hostname")
+priv_ip = get_ec2_data("local-ipv4")
+myaz = get_ec2_data("placement/availability-zone")
+
+info = {
+  :instance_id => inst_id,
+  :public_hostname => pub_name,
+  :private_ip => priv_ip,
+  :az => myaz
+}
+
+# Lame loop and refresh
+while true
+  info[:last_update] = Time.now.tv_sec
+
+  payload = Yajl::Encoder.encode(info)
+  $log.debug("Updating znode %s/%s with: %s" % [path, inst_id,
+                                                payload])
+
+  ZkRecipes::Presence.update(path, inst_id, payload)
+
+  sleep(opts[:refresh_secs])
+end
