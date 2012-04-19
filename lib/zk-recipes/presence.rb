@@ -4,7 +4,7 @@
 module ZkRecipes
   module Presence
     def self.update(namespace, node_id, payload)
-      root = "/"
+      root = ""
 
       # Create each part of the search path
       namespace.split("/").each do |part|
