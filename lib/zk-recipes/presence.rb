@@ -27,5 +27,34 @@ module ZkRecipes
     rescue ZookeeperExceptions::ZookeeperException => err
       raise "Failed to connect to ZK: #{err.message}"
     end
+
+    def self.list(namespace)
+      root = "/#{namespace}"
+
+      # Read the set of nodes created in our namespace
+      r = ZkRecipes::conn.get_children(:path => root)
+      if r[:rc] != Zookeeper::ZOK
+        raise "Failed to lookup namespace children: %s" % namespace
+      end
+
+      clients = []
+      kids = r[:children]
+
+      kids.each do |kid|
+        path = "#{root}/#{kid}"
+
+        r = ZkRecipes::conn.get(:path => path)
+        if r[:rc] != Zookeeper::ZOK
+          raise "Failed to lookup server details for: %s (disappeared?)" %
+            namespace
+        end
+
+        clients << r[:data]
+      end
+
+      clients
+    rescue ZookeeperExceptions::ZookeeperException => err
+      raise "Failed to connect to ZK: #{err.message}"
+    end
   end
 end

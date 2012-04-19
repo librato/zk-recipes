@@ -13,6 +13,8 @@ require 'rubygems'
 require 'bundler'
 require 'logger'
 
+CLIENT_TIMEOUT = 60 * 15
+
 Bundler.require
 
 $:.unshift File.join(File.dirname(__FILE__), '../lib')
@@ -30,6 +32,8 @@ opts = Trollop::options do
 
   opt :logfile, "Logfile", :default => "/var/log/zk-ec2-presenced.log"
   opt :loglevel, "Loglevel", :default => "INFO"
+
+  opt :list, "List registered instances"
 end
 
 unless opts[:hosts]
@@ -52,10 +56,11 @@ end
 
 $log = Logger.new(file, opts[:loglevel].upcase)
 
-inst_id = %x{curl -s http://169.254.169.254/latest/meta-data/instance-id}.chomp
-pub_name = %x{curl -s http://169.254.169.254/latest/meta-data/public-hostname}.chomp
-priv_ip = %x{curl -s http://169.254.169.254/latest/meta-data/local-ipv4}.chomp
-myaz = %x{curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone}.chomp
+def get_ec2_data(file)
+  %x{curl -s http://169.254.169.254/latest/meta-data/#{file}}.chomp
+end
+
+path = "#{opts[:namespace]}/#{opts[:type]}"
 
 zk_hosts = opts[:hosts].split(",")
 zk_host = zk_hosts[rand(zk_hosts.length)]
@@ -64,14 +69,48 @@ $log.info("Connecting to ZK host at #{zk_host}:#{opts[:port]}")
 
 ZkRecipes.setup(zk_host, opts[:port])
 
+if opts[:list]
+  clients = ZkRecipes::Presence.list(path)
+  now = Time.now.tv_sec
+
+  active_clients = []
+
+  clients.each do |client|
+    client = Yajl::Parser.parse(client)
+
+    if client['last_update'] &&
+        (client['last_update'] > now ||
+         (now - client['last_update']) < CLIENT_TIMEOUT)
+      active_clients << client
+    end
+  end
+
+  if active_clients.length == 0
+    puts "No active clients."
+  else
+    puts "Active clients:"
+    puts
+    puts "%10s  %14s  %s" % ['AZ', 'IP Addr', 'Hostname']
+    active_clients.each do |cl|
+      puts "%10s  %14s  %s" % [cl['az'], cl['private_ip'],
+                              cl['public_hostname']]
+    end
+  end
+
+  exit 0
+end
+
+inst_id = get_ec2_data("instance-id")
+pub_name = get_ec2_data("public-hostname")
+priv_ip = get_ec2_data("local-ipv4")
+myaz = get_ec2_data("placement/availability-zone")
+
 info = {
   :instance_id => inst_id,
   :public_hostname => pub_name,
   :private_ip => priv_ip,
   :az => myaz
 }
-
-path = "#{opts[:namespace]}/#{opts[:type]}"
 
 # Lame loop and refresh
 while true
