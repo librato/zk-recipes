@@ -26,7 +26,7 @@ opts = Trollop::options do
   opt :port, "ZK Port", :default => 2181
 
   opt :namespace, "ZK Namespace", :default => "presence"
-  opt :type, "Node type", :type => :string
+  opt :types, "Node type(s)", :type => :string
 
   opt :refresh_secs, "How often to refresh (in seconds)", :default => 300
 
@@ -41,7 +41,7 @@ unless opts[:hosts]
   exit 1
 end
 
-unless opts[:type]
+unless opts[:types]
   puts "Must specify node type"
   exit 1
 end
@@ -60,8 +60,6 @@ def get_ec2_data(file)
   %x{curl -s http://169.254.169.254/latest/meta-data/#{file}}.chomp
 end
 
-path = "#{opts[:namespace]}/#{opts[:type]}"
-
 zk_hosts = opts[:hosts].split(",")
 zk_host = zk_hosts[rand(zk_hosts.length)]
 
@@ -69,7 +67,8 @@ $log.info("Connecting to ZK host at #{zk_host}:#{opts[:port]}")
 
 ZkRecipes.setup(zk_host, opts[:port])
 
-if opts[:list]
+def list_clients(namespace, type)
+  path = "#{namespace}/#{type}"
   clients = ZkRecipes::Presence.list(path)
   now = Time.now.tv_sec
 
@@ -93,8 +92,16 @@ if opts[:list]
     puts "%10s  %14s  %s" % ['AZ', 'IP Addr', 'Hostname']
     active_clients.each do |cl|
       puts "%10s  %14s  %s" % [cl['az'], cl['private_ip'],
-                              cl['public_hostname']]
+                               cl['public_hostname']]
     end
+  end
+end
+
+if opts[:list]
+  opts[:types].split(",").each_with_index do |type, idx|
+    puts if idx > 0
+    puts "> Type: #{type}"
+    list_clients(opts[:namespace], type)
   end
 
   exit 0
@@ -117,10 +124,16 @@ while true
   info[:last_update] = Time.now.tv_sec
 
   payload = Yajl::Encoder.encode(info)
-  $log.debug("Updating znode %s/%s with: %s" % [path, inst_id,
-                                                payload])
 
-  ZkRecipes::Presence.update(path, inst_id, payload)
+  # Update each type we are registering as
+  opts[:types].split(",").each do |type|
+    path = "#{opts[:namespace]}/#{type}"
+
+    $log.debug("Updating znode %s/%s with: %s" %
+               [path, inst_id, payload])
+
+    ZkRecipes::Presence.update(path, inst_id, payload)
+  end
 
   sleep(opts[:refresh_secs])
 end
