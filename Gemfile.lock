@@ -11,16 +11,16 @@ GEM
     shoulda (2.11.3)
     trollop (1.16.2)
     yajl-ruby (1.1.0)
-    zookeeper (0.4.4)
+    zookeeper (1.4.2)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
-  bundler (~> 1.0.0)
+  bundler
   jeweler (~> 1.6.4)
   rcov
   shoulda
   trollop (~> 1.16.2)
   yajl-ruby (~> 1.1.0)
-  zookeeper (~> 0.4.4)
+  zookeeper
