@@ -10,7 +10,7 @@ GEM
     rcov (0.9.11)
     shoulda (2.11.3)
     trollop (1.16.2)
-    yajl-ruby (1.1.0)
+    yajl-ruby (1.4.1)
     zookeeper (1.4.2)
 
 PLATFORMS
