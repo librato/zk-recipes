@@ -3,7 +3,7 @@ source "http://rubygems.org"
 gem "zookeeper"
 
 gem "trollop", "~> 1.16.2"
-gem "yajl-ruby", "~> 1.1.0", :require => "yajl"
+gem "yajl-ruby", "~> 1.4.1", :require => "yajl"
 
 # Add dependencies to develop your gem here.
 # Include everything needed to run rake, tests, features, etc.
